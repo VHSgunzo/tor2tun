@@ -1,0 +1,44 @@
+#! /bin/sh
+
+read -p "Enter install dir (/opt/dnscrypt-proxy) > " INSTALL_DIR
+LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+lversion=$("${INSTALL_DIR}/dnscrypt-proxy" -version)
+rmersion=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
+[ -z "$lversion" ] && exit 1
+[ -z "$rmersion" ] && exit 1
+
+echo locally installed
+echo "$lversion"
+
+echo remote git version
+echo "$rmersion"
+workdir="/tmp/dnscrypt"
+
+if [ "$rmersion" != "$lversion" ]; 
+then
+	echo "Update DNSCrypt to version $rmersion"
+	mkdir /tmp/dnscrypt
+	curl -sL $(curl -sL "$LATEST_URL" | grep dnscrypt-proxy-linux_x86_64- | grep browser_download_url | head -1 | cut -d \" -f 4) | tar xz -C "$workdir" -f - 
+	sudo $INSTALL_DIR/dnscrypt-proxy -service stop
+	sudo systemctl disable dnscrypt-proxy
+	sudo $INSTALL_DIR/dnscrypt-proxy -service uninstall
+	sudo rm -r $INSTALL_DIR /bin/dnscrypt-proxy
+	sudo mkdir $INSTALL_DIR
+	sudo cp -r --preserve=all $workdir/linux-x86_64/example-whitelist.txt $INSTALL_DIR/
+	sudo cp -r --preserve=all $workdir/linux-x86_64/example-forwarding-rules.txt $INSTALL_DIR/
+	sudo cp -r --preserve=all $workdir/linux-x86_64/example-cloaking-rules.txt $INSTALL_DIR/
+	sudo cp -r --preserve=all $workdir/linux-x86_64/LICENSE $INSTALL_DIR/
+	sudo cp -r --preserve=all $workdir/linux-x86_64/example-dnscrypt-proxy.toml $INSTALL_DIR/
+	sudo cp -r --preserve=all $workdir/linux-x86_64/example-blacklist.txt $INSTALL_DIR/
+	sudo cp -r --preserve=all $workdir/linux-x86_64/dnscrypt-proxy $INSTALL_DIR/
+	sudo cp -r --preserve=all $INSTALL_DIR/example-dnscrypt-proxy.toml $INSTALL_DIR/dnscrypt-proxy.toml
+	sudo sed -i "30c\server_names = [\'cloudflare\']" $INSTALL_DIR/dnscrypt-proxy.toml
+	sudo sed -i "35c\listen_addresses = [\'127.0.0.1:53\']" $INSTALL_DIR/dnscrypt-proxy.toml
+	sudo $INSTALL_DIR/dnscrypt-proxy -service install
+	sudo ln -s $INSTALL_DIR/dnscrypt-proxy /bin/
+	sudo systemctl enable dnscrypt-proxy
+	sudo $INSTALL_DIR/dnscrypt-proxy -service start
+	sudo rm -r $workdir
+else
+    echo "No Update Needed"
+fi

@@ -1,0 +1,36 @@
+#!/bin/bash
+LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+
+rmersion=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
+
+workdir="/tmp/dnscrypt"
+
+read -p "Enter install dir (/opt/dnscrypt-proxy) > " INSTALL_DIR
+echo "Install DNSCrypt version $rmersion"
+mkdir /tmp/dnscrypt
+curl -sL $(curl -sL "$LATEST_URL" | grep dnscrypt-proxy-linux_x86_64- | grep browser_download_url | head -1 | cut -d \" -f 4) | tar xz -C "$workdir" -f -
+sudo chattr -i /etc/resolv.conf
+sudo mkdir $INSTALL_DIR
+sudo cp -r --preserve=all $workdir/linux-x86_64/example-whitelist.txt $INSTALL_DIR/
+sudo cp -r --preserve=all $workdir/linux-x86_64/example-forwarding-rules.txt $INSTALL_DIR/
+sudo cp -r --preserve=all $workdir/linux-x86_64/example-cloaking-rules.txt $INSTALL_DIR/
+sudo cp -r --preserve=all $workdir/linux-x86_64/LICENSE $INSTALL_DIR/
+sudo cp -r --preserve=all $workdir/linux-x86_64/example-dnscrypt-proxy.toml $INSTALL_DIR/
+sudo cp -r --preserve=all $workdir/linux-x86_64/example-blacklist.txt $INSTALL_DIR/
+sudo cp -r --preserve=all $workdir/linux-x86_64/dnscrypt-proxy $INSTALL_DIR/
+sudo cp -r --preserve=all $INSTALL_DIR/example-dnscrypt-proxy.toml $INSTALL_DIR/dnscrypt-proxy.toml
+sudo sed -i "30c\server_names = [\'cloudflare\']" $INSTALL_DIR/dnscrypt-proxy.toml
+sudo sed -i "35c\listen_addresses = [\'127.0.0.1:53\']" $INSTALL_DIR/dnscrypt-proxy.toml
+sudo systemctl stop systemd-resolved
+sudo systemctl mask systemd-resolved
+sudo apt remove --purge resolvconf -y
+sudo rm -r /etc/resolv.conf
+echo nameserver 127.0.0.1 > /tmp/resolv.conf
+echo options edns0 >> /tmp/resolv.conf
+sudo cp -r /tmp/resolv.conf /etc/resolv.conf
+sudo chattr +i /etc/resolv.conf
+sudo $INSTALL_DIR/dnscrypt-proxy -service install
+sudo ln -s $INSTALL_DIR/dnscrypt-proxy /bin/
+sudo systemctl enable dnscrypt-proxy
+sudo $INSTALL_DIR/dnscrypt-proxy -service start
+sudo rm -r $workdir /tmp/resolv.conf

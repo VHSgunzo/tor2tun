@@ -1,0 +1,37 @@
+#!/bin/bash
+export BLUE='\033[1;94m'
+export RED='\033[1;91m'
+cd "$( dirname "${BASH_SOURCE[0]}")"
+
+read -p "DNSCrypt installing? (y - update / n - install) > " dnscrypt
+
+if [[ ! $dnscrypt =~ ^[Nn]$ ]]; 
+then ./dep_update
+
+elif [[ ! $dnscrypt =~ ^[Yy]$ ]];
+then ./dep_install
+
+fi
+
+sleep 2
+sudo apt update
+sudo apt install bash util-linux procps hostapd iproute2 iw haveged dnsmasq iptables xfce4-terminal net-tools -y
+clear
+echo -e -n "$BLUE"
+read -p "Create symblink for tor2tun to /bin (y/n) > " symblink
+
+if [[ ! $symblink =~ ^[Nn]$ ]]; 
+then dir_script=$(pwd | rev | cut -c 5- | rev)
+	echo '#!/bin/bash' | cat > /tmp/dir_script
+	echo "cd $dir_script" | cat >> /tmp/dir_script
+	echo './tor2tun' | cat >> /tmp/dir_script
+	sudo mv -f /tmp/dir_script /bin/tor2tun
+	sudo chmod +x /bin/tor2tun
+	clear
+	echo -e -n "$RED After close this just write in terminal tor2tun"
+	sleep 5
+
+elif [[ ! $symblink =~ ^[Yy]$ ]];
+then echo -e -n "$BLUE All Done"
+	
+fi

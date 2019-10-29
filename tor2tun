@@ -1,0 +1,52 @@
+#!/bin/bash
+cd "$( dirname "${BASH_SOURCE[0]}")"
+export BLUE='\033[1;94m'
+export RED='\033[1;91m'
+
+title="$RED 		Hi BRO!) it's tor2tun \n"
+prompt=
+options=("Install dependency" "Configure all" "Configure only Wi-Fi" "Tor->namespace" "Tor->namespace->Wi-Fi")
+
+clear
+echo -e -n  "$title"
+PS3="$prompt "
+select opt in "${options[@]}" "Quit"; do 
+
+    case "$REPLY" in
+
+    1 ) clear
+		echo -e -n "$BLUE Installing dependency \n"
+		src/dependency_installer 
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+    2 ) clear
+		echo -e -n "$BLUE Configure all \n"
+		src/configure_all 
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+    3 ) clear
+		echo -e -n "$BLUE Configure only Wi-Fi \n"
+		src/configure_wifi 
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+	4 ) clear
+		echo -e -n "$BLUE Tor->namespace \n"
+		src/torON 
+		clear
+		src/torOFF
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+	5 ) clear
+		echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
+		src/torON_wifi 
+		clear
+		src/torOFF_wifi
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+
+    $(( ${#options[@]}+1 )) ) clear; break;;
+    *) echo -e -n  "$RED Invalid option. Try another one. \n";continue;;
+
+    esac
+
+done

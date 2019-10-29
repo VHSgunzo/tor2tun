@@ -1,0 +1,19 @@
+#!/bin/bash
+cd "$( dirname "${BASH_SOURCE[0]}")"
+
+read -p "Enter name of Wi-Fi interface (wlan1) > " wifi_iface
+sed -i "11c\*$wifi_iface*" variables.conf
+
+read -p "Enter hotspot name (HotSpot) > " wifi_name
+sed -i "12c\*$wifi_name*" variables.conf
+
+read -p "Enter hotspot password (minimum 8 characters) > " wifi_pass
+sed -i "13c\*$wifi_pass*" variables.conf
+
+read -p "Enter hotspot region (BZ) > " wifi_reg
+sed -i "14c\*$wifi_reg*" variables.conf
+
+read -p "Enter hotspot MAC (46:03:08:01:89:55) > " wifi_mac
+sed -i "15c\*$wifi_mac*" variables.conf
+
+cat variables.conf | tr -d '*' > variables.new && mv variables.new variables.conf
