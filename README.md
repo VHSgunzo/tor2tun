@@ -4,6 +4,8 @@
 ```
 * Easy setup
 * Automatic installation of dependencies and DNSCrypt-Proxy
+* Wi-Fi access point settings
+* Сhange mac address Wi-Fi access points
 * Creates a namespace for TOR proxy
 * Creates a namespace for TOR proxies with Wi-Fi access point and DNS encryption through DNSCrypt-Proxy
 * Live monitoring TOR connection
