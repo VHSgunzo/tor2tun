@@ -41,10 +41,14 @@ sudo ip -all netns delete
 # Disable IP-forwarding.
 sudo sysctl -w net.ipv4.ip_forward=0
 
-sudo iptables -F
-sudo iptables -X
+sudo iptables -P INPUT ACCEPT
+sudo iptables -P FORWARD ACCEPT
+sudo iptables -P OUTPUT ACCEPT
 sudo iptables -t nat -F
 sudo iptables -t nat -X
+sudo iptables -t mangle -F
+sudo iptables -F
+sudo iptables -X
 sudo iptables-restore < /tmp/iptables.conf
 
 # Remove trash

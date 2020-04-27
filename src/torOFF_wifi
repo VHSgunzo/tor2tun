@@ -12,7 +12,8 @@ sudo ip addr del dev $bad_tun local 10.9.3.18 peer 10.9.3.17
 sudo ip -4 addr flush label $bad_tun
 sudo ip tuntap del dev $bad_tun mode tun
 sudo service tor stop
-sudo mv /etc/NetworkManager/NetworkManager.old /etc/NetworkManager/NetworkManager.conf
+sudo mv -f /etc/tor/torrc.back /etc/tor/torrc
+sudo mv -f /etc/NetworkManager/NetworkManager.old /etc/NetworkManager/NetworkManager.conf
 nm_pid=$(sudo pidof NetworkManager)
 sudo kill -HUP $nm_pid
 

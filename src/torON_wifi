@@ -20,6 +20,8 @@ sudo sed -i 15c\unmanaged-devices=interface-name:$wifi_iface NetworkManager.conf
 sudo cp NetworkManager.conf /etc/NetworkManager/NetworkManager.conf
 nm_pid=$(sudo pidof NetworkManager)
 sudo kill -HUP $nm_pid
+sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+sudo cp -f ./torrc /etc/tor/torrc
 sudo service tor start
 sleep 5
 sudo ip tuntap add dev $bad_tun mode tun

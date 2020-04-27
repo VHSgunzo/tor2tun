@@ -1,11 +1,33 @@
-# tor2tun
-This script creates a namespace with TOR proxy and creates a TOR Wi-Fi access point with DNS encryption through DNSCrypt-Proxy
-For proper operation, you need to run this script from xfce4-terminal, it will be installed along with the rest of the dependencies when you select the appropriate script menu item.
-To get started:
+# TOR2TUN
 
+## Features:
+```
+* Easy setup
+* Automatic installation of dependencies and DNSCrypt-Proxy
+* Creates a namespace for TOR proxy
+* Creates a namespace for TOR proxies with Wi-Fi access point and DNS encryption through DNSCrypt-Proxy
+* Live monitoring TOR connection
+```
+## Supports:
+```
+All Debian-based distributions
+```
+## To get started:
+* **Download the latest revision**
+```
 git clone https://github.com/VHSgunzo/tor2tun.git
+```
+* **Switch to tool's directory**
+```
 cd tor2tun
+```
+* **Run tor2tun**
+```
 ./tor2tun
-
-select the first item in the script menu to install the necessary dependencies.
-After installing the dependencies, open xfce4-terminal, write tor2tun and select the second item from the script menu to configure it and use
+```
+* Select the "Settings" item in the script menu
+* Fix SUDO passwordless
+* Install the necessary dependencies
+* Configure script
+* **Run this script from xfce4-terminal (will be installed along with the rest of the dependencies)**
+* Use it

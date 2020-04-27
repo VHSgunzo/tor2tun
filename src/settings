@@ -3,34 +3,35 @@ cd "$( dirname "${BASH_SOURCE[0]}")"
 export BLUE='\033[1;94m'
 export RED='\033[1;91m'
 
-title="$RED 		Hi BRO!) it's tor2tun \n"
+title="$RED 		WoW it's Settings \n"
 prompt=
-options=("Tor->namespace" "Tor->namespace->Wi-Fi" "Settings")
+options=("Fix SUDO passwordless" "Install dependency" "Configure all" "Configure only Wi-Fi")
 
 clear
 echo -e -n  "$title"
 PS3="$prompt "
-select opt in "${options[@]}" "Quit"; do 
+select opt in "${options[@]}" "Go Back"; do 
 
     case "$REPLY" in
 
 	1 ) clear
-		echo -e -n "$BLUE Tor->namespace \n"
-		src/torON 
-		clear
-		src/torOFF
+		echo -e -n "$BLUE Fix SUDO passwordless \n"
+		./fix_sudo 
 		clear
 		echo -e -n  "$RED Press ENTER to continue \n";continue;;
-	2 ) clear
-		echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
-		src/torON_wifi 
-		clear
-		src/torOFF_wifi
+    2 ) clear
+		echo -e -n "$BLUE Installing dependency \n"
+		./dependency_installer 
 		clear
 		echo -e -n  "$RED Press ENTER to continue \n";continue;;
     3 ) clear
-		echo -e -n "$BLUE Settings \n"
-		src/settings
+		echo -e -n "$BLUE Configure all \n"
+		./configure_all 
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+    4 ) clear
+		echo -e -n "$BLUE Configure only Wi-Fi \n"
+		./configure_wifi 
 		clear
 		echo -e -n  "$RED Press ENTER to continue \n";continue;;
 

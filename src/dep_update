@@ -33,7 +33,6 @@ then
 	sudo cp -r --preserve=all $workdir/linux-x86_64/dnscrypt-proxy $INSTALL_DIR/
 	sudo cp -r --preserve=all $INSTALL_DIR/example-dnscrypt-proxy.toml $INSTALL_DIR/dnscrypt-proxy.toml
 	sudo sed -i "30c\server_names = [\'cloudflare\']" $INSTALL_DIR/dnscrypt-proxy.toml
-	#sudo sed -i "37c\listen_addresses = [\'127.0.0.1:53\']" $INSTALL_DIR/dnscrypt-proxy.toml
 	sudo $INSTALL_DIR/dnscrypt-proxy -service install
 	sudo ln -s $INSTALL_DIR/dnscrypt-proxy /bin/
 	sudo systemctl enable dnscrypt-proxy

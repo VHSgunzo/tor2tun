@@ -15,7 +15,7 @@ fi
 
 sleep 2
 sudo apt update
-sudo apt install bash util-linux procps hostapd iproute2 iw haveged dnsmasq iptables xfce4-terminal net-tools -y
+sudo apt install tor tor-geoipdb nyx bash util-linux procps hostapd iproute2 iw haveged dnsmasq iptables xfce4-terminal net-tools -y
 clear
 echo -e -n "$BLUE"
 read -p "Create symblink for tor2tun to /bin (y/n) > " symblink

@@ -11,6 +11,7 @@ sudo ip route del 10.9.0.1/32 via 10.9.3.17
 sudo ip addr del dev $bad_tun local 10.9.3.18 peer 10.9.3.17
 sudo ip -4 addr flush label $bad_tun
 sudo ip tuntap del dev $bad_tun mode tun
+sudo mv -f /etc/tor/torrc.back /etc/tor/torrc
 sudo service tor stop
 
 xfce4-terminal --geometry=62x24 --hide-scrollbar --hide-toolbar --hide-borders --working-directory=$dist -e "./nameOFF"

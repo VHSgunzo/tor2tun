@@ -13,6 +13,8 @@ socks_server="$local_ip:$local_port"
 pwd | cat > /tmp/dist
 dist=$(cat /tmp/dist)
 sudo iptables-save > /tmp/iptables.conf
+sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+sudo cp -f ./torrc /etc/tor/torrc
 sudo service tor start
 sleep 5
 sudo ip tuntap add dev $bad_tun mode tun
