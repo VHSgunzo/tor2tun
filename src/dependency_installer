@@ -28,7 +28,7 @@ then dir_script=$(pwd | rev | cut -c 5- | rev)
 	sudo mv -f /tmp/dir_script /bin/tor2tun
 	sudo chmod +x /bin/tor2tun
 	clear
-	echo -e -n "$RED After close this just write in terminal tor2tun"
+	echo -e -n "$RED After close this just write tor2tun in xfce4-terminal"
 	sleep 5
 
 elif [[ ! $symblink =~ ^[Yy]$ ]];
