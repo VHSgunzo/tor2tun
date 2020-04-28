@@ -13,7 +13,7 @@ then ./dep_install
 
 fi
 
-sleep 2
+sleep 3
 sudo apt update
 sudo apt install tor tor-geoipdb nyx bash util-linux procps hostapd iproute2 iw haveged dnsmasq iptables xfce4-terminal net-tools -y
 clear
