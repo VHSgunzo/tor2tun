@@ -5,7 +5,7 @@ export RED='\033[1;91m'
 
 title="$RED 		Hi BRO!) it's tor2tun \n"
 prompt=
-options=("Tor->namespace" "Tor->namespace->Wi-Fi" "Settings")
+options=("Tor->System" "Tor->namespace" "Tor->System->namespace" "Tor->namespace->Wi-Fi" "Tor->System->namespace->Wi-Fi" "Settings")
 
 clear
 echo -e -n  "$title"
@@ -15,20 +15,41 @@ select opt in "${options[@]}" "Quit"; do
     case "$REPLY" in
 
 	1 ) clear
-		echo -e -n "$BLUE Tor->namespace \n"
-		src/torON 
+		echo -e -n "$BLUE Tor->System \n"
+		src/torON_sys
 		clear
-		src/torOFF
+		src/torOFF_sys
 		clear
 		echo -e -n  "$RED Press ENTER to continue \n";continue;;
 	2 ) clear
-		echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
-		src/torON_wifi 
+		echo -e -n "$BLUE Tor->namespace \n"
+		src/torON_name
 		clear
-		src/torOFF_wifi
+		src/torOFF_name
 		clear
 		echo -e -n  "$RED Press ENTER to continue \n";continue;;
-    3 ) clear
+	3 ) clear
+		echo -e -n "$BLUE Tor->System->namespace \n"
+		src/torON_name_sys
+		clear
+		src/torOFF_name
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+	4 ) clear
+		echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
+		src/torON_name_wifi
+		clear
+		src/torOFF_name_wifi
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+	5 ) clear
+		echo -e -n "$BLUE Tor->System->namespace->Wi-Fi \n"
+		src/torON_name_sys_wifi
+		clear
+		src/torOFF_name_wifi
+		clear
+		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+    6 ) clear
 		echo -e -n "$BLUE Settings \n"
 		src/settings
 		clear

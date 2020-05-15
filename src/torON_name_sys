@@ -1,0 +1,52 @@
+#!/bin/bash
+cd "$( dirname "${BASH_SOURCE[0]}")"
+set -x
+TOR_EXCLUDE="192.168.0.0/16 172.16.0.0/12 10.0.0.0/8"
+TOR_UID="debian-tor"
+TOR_PORT="9040"
+TOR_DNSPort="5353"
+local_ip=$(sed '2!d' variables.conf)
+local_port=$(sed '3!d' variables.conf)
+bind_iface=$(sed '4!d' variables.conf)
+bad_tun=$(sed '5!d' variables.conf)
+id="$RANDOM"
+socks_server="$local_ip:$local_port"
+pwd | cat > /tmp/dist
+dist=$(cat /tmp/dist)
+sudo iptables-save > /tmp/iptables.conf
+sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+sudo cp -f ./torrc /etc/tor/torrc
+sudo service tor start
+sleep 5
+sudo iptables -t nat -A OUTPUT -m owner --uid-owner $TOR_UID -j RETURN
+sudo iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+sudo iptables -t nat -A OUTPUT -p tcp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+sudo iptables -t nat -A OUTPUT -p udp -m owner --uid-owner $TOR_UID -m udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+sudo iptables -t nat -A OUTPUT -p tcp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+sudo iptables -t nat -A OUTPUT -p udp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+for NET in $TOR_EXCLUDE 127.0.0.0/9 127.128.0.0/10; do
+sudo iptables -t nat -A OUTPUT -d $NET -j RETURN
+done
+sudo iptables -t nat -A OUTPUT -p tcp --syn -j REDIRECT --to-ports $TOR_PORT
+sudo iptables -t nat -A OUTPUT -p udp -j REDIRECT --to-ports $TOR_PORT
+sudo iptables -t nat -A OUTPUT -p icmp -j REDIRECT --to-ports $TOR_PORT
+sudo iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+for NET in $TOR_EXCLUDE 127.0.0.0/8; do
+sudo iptables -A OUTPUT -d $NET -j ACCEPT
+done
+sudo iptables -A OUTPUT -m owner --uid-owner $TOR_UID -j ACCEPT
+sudo iptables -A OUTPUT -j REJECT
+sudo ip tuntap add dev $bad_tun mode tun
+sudo ip link set $bad_tun up
+sudo ip link set dev $bad_tun up mtu 1500
+sudo ip addr add 10.0.0.1/30 dev $bad_tun
+sudo ip addr add dev $bad_tun local 10.9.3.18 peer 10.9.3.17
+sudo ip route add 10.9.0.1/32 via 10.9.3.17
+sudo sysctl -w net.ipv4.conf.$bad_tun.forwarding=1
+sudo ip rule add fwmark $id lookup $id
+sudo ip route add default via 10.0.0.2 table $id
+sudo iptables -t mangle -I PREROUTING -i $bind_iface -p tcp -j MARK --set-mark $id
+
+xfce4-terminal --geometry=62x24 --hide-scrollbar --hide-toolbar --hide-borders --working-directory=$dist -e "./nameON"
+
+sudo ./badvpn-tun2socks --tundev $bad_tun --netif-ipaddr 10.0.0.2 --netif-netmask 255.255.255.0 --socks-server-addr $socks_server
