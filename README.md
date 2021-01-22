@@ -10,15 +10,16 @@
 * Creates a namespace for TOR
 * Creates a namespace for TOR with Wi-Fi access point and DNS encryption through DNSCrypt-Proxy
 * Live monitoring TOR connection
+* Live monitoring Wi-Fi access point clients
 ```
 ## Supports:
 ```
-All Debian-based distributions
+All Arch-based distributions
 ```
 ## To get started:
 * **Download the latest revision**
 ```
-git clone https://github.com/VHSgunzo/tor2tun.git
+git clone -b arch https://github.com/VHSgunzo/tor2tun.git
 ```
 * **Switch to tool's directory**
 ```
@@ -32,5 +33,4 @@ cd tor2tun
 * Fix SUDO passwordless
 * Install the necessary dependencies
 * Configure script
-* **Run this script from xfce4-terminal (will be installed along with the rest of the dependencies)**
 * Use it
