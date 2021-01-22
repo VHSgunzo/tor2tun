@@ -1,3 +1,0 @@
-#!/bin/bash
-sudo deluser $USER sudo
-echo "$USER ALL=NOPASSWD:ALL" | sudo su -c 'cat >> /etc/sudoers'

@@ -1,63 +1,900 @@
 #!/bin/bash
-cd "$( dirname "${BASH_SOURCE[0]}")"
+cd $(dirname "${BASH_SOURCE[0]}")
 export BLUE='\033[1;94m'
 export RED='\033[1;91m'
+export RESETCOLOR='\033[1;00m'
 
-title="$RED 		Hi BRO!) it's tor2tun \n"
-prompt=
-options=("Tor->System" "Tor->namespace" "Tor->System->namespace" "Tor->namespace->Wi-Fi" "Tor->System->namespace->Wi-Fi" "Settings")
+function torON_sys {
+TOR_EXCLUDE="192.168.0.0/16 172.16.0.0/12 10.0.0.0/8"
+TOR_UID="tor"
+TOR_PORT="9040"
+TOR_DNSPort="5353"
+check_ip="ident.me"
+if [ "$(ping -4 -q -c1 -W0.5 google.com &>/dev/null && echo online || echo offline)" == "offline" ]
+    then
+        break
+    else
+        sudo iptables-save > /tmp/iptables.conf
+        sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+        sudo cp -f src/sys.conf/torrc /etc/tor/torrc
+        sudo systemctl start tor
+        while true
+            do
+                if ! [ -z $(torify curl -s $check_ip 2>/dev/null) ]
+                    then
+                        sudo iptables -t nat -A OUTPUT -m owner --uid-owner $TOR_UID -j RETURN
+                        sudo iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p tcp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p udp -m owner --uid-owner $TOR_UID -m udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p tcp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p udp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+                        for NET in $TOR_EXCLUDE 127.0.0.0/9 127.128.0.0/10
+                            do
+                                sudo iptables -t nat -A OUTPUT -d $NET -j RETURN
+                        done
+                        sudo iptables -t nat -A OUTPUT -p tcp --syn -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p udp -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p icmp -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+                        for NET in $TOR_EXCLUDE 127.0.0.0/8
+                            do
+                                sudo iptables -A OUTPUT -d $NET -j ACCEPT
+                        done
+                        sudo iptables -A OUTPUT -m owner --uid-owner $TOR_UID -j ACCEPT
+                        sudo iptables -A OUTPUT -j REJECT
+                        clear
+                        while true
+                            do
+                                sudo runuser -u $TOR_UID nyx
+                                break
+                        done
+                        clear
+                        sudo systemctl stop tor
+                        sudo mv -f /etc/tor/torrc.back /etc/tor/torrc
+                        sudo iptables -P INPUT ACCEPT
+                        sudo iptables -P FORWARD ACCEPT
+                        sudo iptables -P OUTPUT ACCEPT
+                        sudo iptables -t nat -F
+                        sudo iptables -t nat -X
+                        sudo iptables -t mangle -F
+                        sudo iptables -F
+                        sudo iptables -X
+                        sudo iptables-restore < /tmp/iptables.conf
+                        rm -rf /tmp/iptables.conf
+                    else
+                        sleep 1
+                        continue
+                fi
+                break
+            done
+fi
+}
 
+function nameON {
+TOR_UID="tor"
+NS=$(sed '6!d' src/sys.conf/variables.conf)
+VETH=$(sed '7!d' src/sys.conf/variables.conf)
+VPEER=$(sed '8!d' src/sys.conf/variables.conf)
+VETH_ADDR=$(sed '9!d' src/sys.conf/variables.conf)
+VPEER_ADDR=$(sed '10!d' src/sys.conf/variables.conf)
+bad_tun=$(sed '5!d' src/sys.conf/variables.conf)
+if ! [ -z $KDE_FULL_SESSION ]
+    then
+        envi_vars="HOME=/home/$USER PULSE_SERVER=/run/user/$(id -u $USER)/pulse/native PULSE_COOKIE=/home/$USER/.config/pulse/cookie DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY KDE_SESSION_VERSION=5 KDE_FULL_SESSION=true XDG_RUNTIME_DIR=/run/user/$(id -u $USER) DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/namespace_dbus NO_AT_BRIDGE=1"
+    else
+        envi_vars="HOME=/home/$USER PULSE_SERVER=/run/user/$(id -u $USER)/pulse/native PULSE_COOKIE=/home/$USER/.config/pulse/cookie DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY XDG_RUNTIME_DIR=/run/user/$(id -u $USER) DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/namespace_dbus NO_AT_BRIDGE=1"
+fi
+sudo ip netns add $NS
+sudo ip link add ${VETH} type veth peer name ${VPEER}
+sudo ip link set ${VPEER} netns $NS
+sudo ip addr add ${VETH_ADDR}/24 dev ${VETH}
+sudo ip link set ${VETH} up
+sudo ip netns exec $NS ip addr add ${VPEER_ADDR}/24 dev ${VPEER}
+sudo ip netns exec $NS ip link set ${VPEER} up
+sudo ip netns exec $NS ip link set lo up
+sudo ip netns exec $NS ip route add default via ${VETH_ADDR}
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo iptables -t nat -A POSTROUTING -s ${VPEER_ADDR}/24 -o $bad_tun -j MASQUERADE
+sudo iptables -A FORWARD -i $bad_tun -o ${VETH} -j ACCEPT
+sudo iptables -A FORWARD -o $bad_tun -i ${VETH} -j ACCEPT
+ls /dev/pts/ | cat > /tmp/ttyold
+xdg-dbus-proxy $DBUS_SESSION_BUS_ADDRESS /tmp/namespace_dbus &
+xterm 2>/dev/null &
+xterm 2>/dev/null &
+xterm 2>/dev/null &
+sleep 1
+ls /dev/pts/ | cat > /tmp/ttynew
+comm -3 /tmp/ttyold /tmp/ttynew|sed s/'\s'//g|cat > /tmp/tty
+rm -rf /tmp/ttyold /tmp/ttynew
+dns=$(sed '1!d' /tmp/tty)
+namespace=$(sed '2!d' /tmp/tty)
+tor_nyx=$(sed '3!d' /tmp/tty)
+sudo src/ttyecho -n /dev/pts/$tor_nyx "sudo runuser -u $TOR_UID nyx"
+sudo src/ttyecho -n /dev/pts/$dns "sudo ip netns exec $NS sudo -u $USER -i"
+sudo src/ttyecho -n /dev/pts/$dns "sudo dnscrypt-proxy --config /etc/dnscrypt-proxy/dnscrypt-proxy.toml"
+sudo src/ttyecho -n /dev/pts/$namespace "sudo ip netns exec $NS sudo -u $USER -i"
+sudo src/ttyecho -n /dev/pts/$namespace "export $envi_vars ; clear"
+}
+
+function nameOFF {
+NS=$(sed '6!d' src/sys.conf/variables.conf)
+VETH=$(sed '7!d' src/sys.conf/variables.conf)
+VPEER=$(sed '8!d' src/sys.conf/variables.conf)
+VETH_ADDR=$(sed '9!d' src/sys.conf/variables.conf)
+VPEER_ADDR=$(sed '10!d' src/sys.conf/variables.conf)
+sudo ip netns exec $NS ip route del default via $VETH_ADDR
+sudo ip netns exec $NS ip addr del $VPEER_ADDR/24 dev $VPEER
+sudo ip netns exec $NS ip link set $VPEER down
+sudo ip netns exec $NS ip link set $VPEER netns 1
+sudo ip link set $VETH down
+sudo ip link del $VETH type veth peer name $VPEER
+sudo ip -4 addr flush label $VPEER
+sudo ip -4 addr flush label $VETH
+sudo ip netns exec $NS ip link set lo down
+sudo ip -all netns delete
+sudo sysctl -w net.ipv4.ip_forward=0
+sudo iptables -P INPUT ACCEPT
+sudo iptables -P FORWARD ACCEPT
+sudo iptables -P OUTPUT ACCEPT
+sudo iptables -t nat -F
+sudo iptables -t nat -X
+sudo iptables -t mangle -F
+sudo iptables -F
+sudo iptables -X
+sudo iptables-restore < /tmp/iptables.conf
+rm -rf /tmp/tty /tmp/iptables.conf /tmp/namespace_dbus
+}
+
+function nameON_Wi-Fi {
+TOR_UID="tor"
+NS=$(sed '6!d' src/sys.conf/variables.conf)
+VETH=$(sed '7!d' src/sys.conf/variables.conf)
+VPEER=$(sed '8!d' src/sys.conf/variables.conf)
+VETH_ADDR=$(sed '9!d' src/sys.conf/variables.conf)
+VPEER_ADDR=$(sed '10!d' src/sys.conf/variables.conf)
+wifi_iface=$(sed '11!d' src/sys.conf/variables.conf)
+wifi_name=$(sed '12!d' src/sys.conf/variables.conf)
+wifi_pass=$(sed '13!d' src/sys.conf/variables.conf)
+wifi_reg=$(sed '14!d' src/sys.conf/variables.conf)
+wifi_mac=$(sed '15!d' src/sys.conf/variables.conf)
+bad_tun=$(sed '5!d' src/sys.conf/variables.conf)
+wifi_phy=$(cat /tmp/wifi_phy)
+sudo ip netns add $NS
+sudo ip link add ${VETH} type veth peer name ${VPEER}
+sudo ip link set ${VPEER} netns $NS
+sudo ip addr add ${VETH_ADDR}/24 dev ${VETH}
+sudo ip link set ${VETH} up
+sudo ip netns exec $NS ip addr add ${VPEER_ADDR}/24 dev ${VPEER}
+sudo ip netns exec $NS ip link set ${VPEER} up
+sudo ip netns exec $NS ip link set lo up
+sudo ip netns exec $NS ip route add default via ${VETH_ADDR}
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo iptables -t nat -A POSTROUTING -s ${VPEER_ADDR}/24 -o $bad_tun -j MASQUERADE
+sudo iptables -A FORWARD -i $bad_tun -o ${VETH} -j ACCEPT
+sudo iptables -A FORWARD -o $bad_tun -i ${VETH} -j ACCEPT
+sudo iw phy $wifi_phy set netns name $NS
+ls /dev/pts/ | cat > /tmp/ttyold
+xterm 2>/dev/null &
+xterm 2>/dev/null &
+xterm 2>/dev/null &
+sleep 1
+ls /dev/pts/ | cat > /tmp/ttynew
+comm -3 /tmp/ttyold /tmp/ttynew|sed s/'\s'//g|cat > /tmp/tty
+rm -rf /tmp/ttyold /tmp/ttynew
+dns=$(sed '1!d' /tmp/tty)
+hotspot=$(sed '2!d' /tmp/tty)
+tor_nyx=$(sed '3!d' /tmp/tty)
+sudo src/ttyecho -n /dev/pts/$tor_nyx "sudo runuser -u $TOR_UID nyx"
+sudo src/ttyecho -n /dev/pts/$dns "sudo ip netns exec $NS sudo -u $USER -i"
+sudo src/ttyecho -n /dev/pts/$dns "sudo dnscrypt-proxy --config /etc/dnscrypt-proxy/dnscrypt-proxy.toml"
+sudo src/ttyecho -n /dev/pts/$hotspot "sudo ip netns exec $NS sudo -u $USER -i ; clear"
+sleep 2
+sudo src/ttyecho -n /dev/pts/$hotspot "clear; sudo $(dirname "${BASH_SOURCE[0]}")/src/create_ap --daemon $wifi_iface $VPEER $wifi_name '$wifi_pass' --country $wifi_reg --mac $wifi_mac --no-virt ; while true; do sudo create_ap --list-clients $wifi_iface; sleep 2; clear; done"
+}
+
+function nameOFF_Wi-Fi {
+NS=$(sed '6!d' src/sys.conf/variables.conf)
+VETH=$(sed '7!d' src/sys.conf/variables.conf)
+VPEER=$(sed '8!d' src/sys.conf/variables.conf)
+VETH_ADDR=$(sed '9!d' src/sys.conf/variables.conf)
+VPEER_ADDR=$(sed '10!d' src/sys.conf/variables.conf)
+wifi_phy=$(cat /tmp/wifi_phy)
+sudo ip netns exec $NS iw phy $wifi_phy set netns 1
+sudo mv -f /etc/NetworkManager/NetworkManager.old /etc/NetworkManager/NetworkManager.conf
+sudo pkill -HUP NetworkManager
+sudo ip netns exec $NS ip route del default via $VETH_ADDR
+sudo ip netns exec $NS ip addr del $VPEER_ADDR/24 dev $VPEER
+sudo ip netns exec $NS ip link set $VPEER down
+sudo ip netns exec $NS ip link set $VPEER netns 1
+sudo ip link set $VETH down
+sudo ip link del $VETH type veth peer name $VPEER
+sudo ip -4 addr flush label $VPEER
+sudo ip -4 addr flush label $VETH
+sudo ip netns exec $NS ip link set lo down
+sudo ip -all netns delete
+sudo sysctl -w net.ipv4.ip_forward=0
+sudo iptables -P INPUT ACCEPT
+sudo iptables -P FORWARD ACCEPT
+sudo iptables -P OUTPUT ACCEPT
+sudo iptables -t nat -F
+sudo iptables -t nat -X
+sudo iptables -t mangle -F
+sudo iptables -F
+sudo iptables -X
+sudo iptables-restore < /tmp/iptables.conf
+sudo rm -rf /tmp/tty /tmp/iptables.conf /tmp/wifi_phy /tmp/create_ap.*.lock
+}
+
+function torOFF_name {
 clear
-echo -e -n  "$title"
-PS3="$prompt "
-select opt in "${options[@]}" "Quit"; do 
+sudo ip route del 10.8.0.1/32 via 10.8.3.17
+sudo ip addr del dev $bad_tun local 10.8.3.18 peer 10.8.3.17
+sudo ip -4 addr flush label $bad_tun
+sudo ip tuntap del dev $bad_tun mode tun
+sudo systemctl stop tor
+sudo mv -f /etc/tor/torrc.back /etc/tor/torrc
+sudo pkill -15 xdg-dbus-proxy
+nameOFF
+}
 
+function torON_name {
+local_ip=$(sed '2!d' src/sys.conf/variables.conf)
+local_port=$(sed '3!d' src/sys.conf/variables.conf)
+bind_iface=$(sed '4!d' src/sys.conf/variables.conf)
+bad_tun=$(sed '5!d' src/sys.conf/variables.conf)
+id="$RANDOM"
+check_ip="ident.me"
+socks_server="$local_ip:$local_port"
+if [ "$(ping -4 -q -c1 -W0.5 google.com &>/dev/null && echo online || echo offline)" == "offline" ]
+    then
+        break
+    else
+        sudo iptables-save > /tmp/iptables.conf
+        sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+        sudo cp -f src/sys.conf/torrc /etc/tor/torrc
+        sudo systemctl start tor
+        while true
+            do
+                if ! [ -z $(torify curl -s $check_ip 2>/dev/null) ]
+                    then
+                        sudo ip tuntap add dev $bad_tun mode tun
+                        sudo ip link set $bad_tun up
+                        sudo ip link set dev $bad_tun up mtu 1500
+                        sudo ip addr add 10.0.1.1/30 dev $bad_tun
+                        sudo ip addr add dev $bad_tun local 10.8.3.18 peer 10.8.3.17
+                        sudo ip route add 10.8.0.1/32 via 10.8.3.17
+                        sudo sysctl -w net.ipv4.conf.$bad_tun.forwarding=1
+                        sudo ip rule add fwmark $id lookup $id
+                        sudo ip route add default via 10.0.1.2 table $id
+                        sudo iptables -t mangle -I PREROUTING -i $bind_iface -p tcp -j MARK --set-mark $id
+                        nameON
+                        clear
+                        while true
+                            do
+                                sudo src/badvpn --tundev $bad_tun --netif-ipaddr 10.0.1.2 --netif-netmask 255.255.255.0 --socks-server-addr $socks_server
+                                break
+                        done
+                        torOFF_name
+                    else
+                        sleep 1
+                        continue
+                fi
+                break
+            done
+fi
+}
+
+function torON_name_sys {
+TOR_EXCLUDE="192.168.0.0/16 172.16.0.0/12 10.0.0.0/8"
+TOR_UID="tor"
+TOR_PORT="9040"
+TOR_DNSPort="5353"
+local_ip=$(sed '2!d' src/sys.conf/variables.conf)
+local_port=$(sed '3!d' src/sys.conf/variables.conf)
+bind_iface=$(sed '4!d' src/sys.conf/variables.conf)
+bad_tun=$(sed '5!d' src/sys.conf/variables.conf)
+id="$RANDOM"
+check_ip="ident.me"
+socks_server="$local_ip:$local_port"
+if [ "$(ping -4 -q -c1 -W0.5 google.com &>/dev/null && echo online || echo offline)" == "offline" ]
+    then
+        break
+    else
+        sudo iptables-save > /tmp/iptables.conf
+        sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+        sudo cp -f src/sys.conf/torrc /etc/tor/torrc
+        sudo systemctl start tor
+        while true
+            do
+                if ! [ -z $(torify curl -s $check_ip 2>/dev/null) ]
+                    then
+                        sudo iptables -t nat -A OUTPUT -m owner --uid-owner $TOR_UID -j RETURN
+                        sudo iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p tcp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p udp -m owner --uid-owner $TOR_UID -m udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p tcp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p udp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+                        for NET in $TOR_EXCLUDE 127.0.0.0/9 127.128.0.0/10
+                            do
+                                sudo iptables -t nat -A OUTPUT -d $NET -j RETURN
+                        done
+                        sudo iptables -t nat -A OUTPUT -p tcp --syn -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p udp -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p icmp -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+                        for NET in $TOR_EXCLUDE 127.0.0.0/8
+                            do
+                                sudo iptables -A OUTPUT -d $NET -j ACCEPT
+                        done
+                        sudo iptables -A OUTPUT -m owner --uid-owner $TOR_UID -j ACCEPT
+                        sudo iptables -A OUTPUT -j REJECT
+                        sudo ip tuntap add dev $bad_tun mode tun
+                        sudo ip link set $bad_tun up
+                        sudo ip link set dev $bad_tun up mtu 1500
+                        sudo ip addr add 10.0.0.1/30 dev $bad_tun
+                        sudo ip addr add dev $bad_tun local 10.9.3.18 peer 10.9.3.17
+                        sudo ip route add 10.9.0.1/32 via 10.9.3.17
+                        sudo sysctl -w net.ipv4.conf.$bad_tun.forwarding=1
+                        sudo ip rule add fwmark $id lookup $id
+                        sudo ip route add default via 10.0.0.2 table $id
+                        sudo iptables -t mangle -I PREROUTING -i $bind_iface -p tcp -j MARK --set-mark $id
+                        nameON
+                        clear
+                        while true
+                            do
+                                sudo src/badvpn --tundev $bad_tun --netif-ipaddr 10.0.0.2 --netif-netmask 255.255.255.0 --socks-server-addr $socks_server
+                                break
+                        done
+                        torOFF_name
+                    else
+                        sleep 1
+                        continue
+                fi
+                break
+            done
+fi
+}
+
+function torOFF_name_wifi {
+clear
+bad_tun=$(sed '5!d' src/sys.conf/variables.conf)
+sudo ip route del 10.9.0.1/32 via 10.9.3.17
+sudo ip addr del dev $bad_tun local 10.9.3.18 peer 10.9.3.17
+sudo ip -4 addr flush label $bad_tun
+sudo ip tuntap del dev $bad_tun mode tun
+sudo systemctl stop tor
+sudo mv -f /etc/tor/torrc.back /etc/tor/torrc
+nameOFF_Wi-Fi
+}
+
+function torON_name_wifi {
+local_ip=$(sed '2!d' src/sys.conf/variables.conf)
+local_port=$(sed '3!d' src/sys.conf/variables.conf)
+bind_iface=$(sed '4!d' src/sys.conf/variables.conf)
+wifi_iface=$(sed '11!d' src/sys.conf/variables.conf)
+bad_tun=$(sed '5!d' src/sys.conf/variables.conf)
+id="$RANDOM"
+socks_server="$local_ip:$local_port"
+check_ip="ident.me"
+if [ "$(ping -4 -q -c1 -W0.5 google.com &>/dev/null && echo online || echo offline)" == "offline" ]
+    then
+        break
+    else
+        cat /sys/class/net/$wifi_iface/phy80211/name > /tmp/wifi_phy
+        sudo iptables-save > /tmp/iptables.conf
+        sudo cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.old
+        sudo sed -i 15c\unmanaged-devices=interface-name:$wifi_iface src/sys.conf/NetworkManager.conf
+        sudo cp src/sys.conf/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf
+        sudo pkill -HUP NetworkManager
+        sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+        sudo cp -f src/sys.conf/torrc /etc/tor/torrc
+        sudo systemctl start tor
+        while true
+            do
+                if ! [ -z $(torify curl -s $check_ip 2>/dev/null) ]
+                    then
+                        sudo ip tuntap add dev $bad_tun mode tun
+                        sudo ip link set $bad_tun up
+                        sudo ip link set dev $bad_tun up mtu 1500
+                        sudo ip addr add 10.0.0.1/30 dev $bad_tun
+                        sudo ip addr add dev $bad_tun local 10.9.3.18 peer 10.9.3.17
+                        sudo ip route add 10.9.0.1/32 via 10.9.3.17
+                        sudo sysctl -w net.ipv4.conf.$bad_tun.forwarding=1
+                        sudo ip rule add fwmark $id lookup $id
+                        sudo ip route add default via 10.0.0.2 table $id
+                        sudo iptables -t mangle -I PREROUTING -i $bind_iface -p tcp -j MARK --set-mark $id
+                        nameON_Wi-Fi
+                        clear
+                        while true
+                            do
+                                sudo src/badvpn --tundev $bad_tun --netif-ipaddr 10.0.0.2 --netif-netmask 255.255.255.0 --socks-server-addr $socks_server
+                                sudo pkill -15 create_ap
+                                break
+                        done
+                        torOFF_name_wifi
+                    else
+                        sleep 1
+                        continue
+                fi
+                break
+            done
+fi
+}
+
+function torON_name_sys_wifi {
+TOR_EXCLUDE="192.168.0.0/16 172.16.0.0/12 10.0.0.0/8"
+TOR_UID="tor"
+TOR_PORT="9040"
+TOR_DNSPort="5353"
+local_ip=$(sed '2!d' src/sys.conf/variables.conf)
+local_port=$(sed '3!d' src/sys.conf/variables.conf)
+bind_iface=$(sed '4!d' src/sys.conf/variables.conf)
+wifi_iface=$(sed '11!d' src/sys.conf/variables.conf)
+bad_tun=$(sed '5!d' src/sys.conf/variables.conf)
+id="$RANDOM"
+socks_server="$local_ip:$local_port"
+check_ip="ident.me"
+if [ "$(ping -4 -q -c1 -W0.5 google.com &>/dev/null && echo online || echo offline)" == "offline" ]
+    then
+        break
+    else
+        cat /sys/class/net/$wifi_iface/phy80211/name > /tmp/wifi_phy
+        sudo iptables-save > /tmp/iptables.conf
+        sudo cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.old
+        sudo sed -i 15c\unmanaged-devices=interface-name:$wifi_iface src/sys.conf/NetworkManager.conf
+        sudo cp src/sys.conf/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf
+        sudo pkill -HUP NetworkManager
+        sudo mv -f /etc/tor/torrc /etc/tor/torrc.back
+        sudo cp -f src/sys.conf/torrc /etc/tor/torrc
+        sudo systemctl start tor
+        while true
+            do
+                if ! [ -z $(torify curl -s $check_ip 2>/dev/null) ]
+                    then
+                        sudo iptables -t nat -A OUTPUT -m owner --uid-owner $TOR_UID -j RETURN
+                        sudo iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p tcp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p udp -m owner --uid-owner $TOR_UID -m udp --dport 53 -j REDIRECT --to-ports $TOR_DNSPort
+                        sudo iptables -t nat -A OUTPUT -p tcp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p udp -d 10.192.0.0/10 -j REDIRECT --to-ports $TOR_PORT
+                        for NET in $TOR_EXCLUDE 127.0.0.0/9 127.128.0.0/10
+                            do
+                                sudo iptables -t nat -A OUTPUT -d $NET -j RETURN
+                        done
+                        sudo iptables -t nat -A OUTPUT -p tcp --syn -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p udp -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -t nat -A OUTPUT -p icmp -j REDIRECT --to-ports $TOR_PORT
+                        sudo iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+                        for NET in $TOR_EXCLUDE 127.0.0.0/8
+                            do
+                                sudo iptables -A OUTPUT -d $NET -j ACCEPT
+                        done
+                        sudo iptables -A OUTPUT -m owner --uid-owner $TOR_UID -j ACCEPT
+                        sudo iptables -A OUTPUT -j REJECT
+                        sudo ip tuntap add dev $bad_tun mode tun
+                        sudo ip link set $bad_tun up
+                        sudo ip link set dev $bad_tun up mtu 1500
+                        sudo ip addr add 10.0.0.1/30 dev $bad_tun
+                        sudo ip addr add dev $bad_tun local 10.9.3.18 peer 10.9.3.17
+                        sudo ip route add 10.9.0.1/32 via 10.9.3.17
+                        sudo sysctl -w net.ipv4.conf.$bad_tun.forwarding=1
+                        sudo ip rule add fwmark $id lookup $id
+                        sudo ip route add default via 10.0.0.2 table $id
+                        sudo iptables -t mangle -I PREROUTING -i $bind_iface -p tcp -j MARK --set-mark $id
+                        nameON_Wi-Fi
+                        clear
+                        while true
+                            do
+                                sudo src/badvpn --tundev $bad_tun --netif-ipaddr 10.0.0.2 --netif-netmask 255.255.255.0 --socks-server-addr $socks_server
+                                sudo pkill -15 create_ap
+                                break
+                        done
+                        torOFF_name_wifi
+                    else
+                        sleep 1
+                        continue
+                fi
+                break
+            done
+fi
+}
+
+function settings {
+
+    function fix_sudo {
+    sudo deluser $USER sudo
+    echo "$USER ALL=NOPASSWD:ALL" | sudo su -c 'cat >> /etc/sudoers'
+    echo -e -n "$RED All Done \n"
+    sleep 3
+    }
+        
+    function install_dependency {
+    sudo pacman -Sy tor torsocks nyx bash util-linux procps hostapd iproute2 iw haveged dnsmasq iptables net-tools git --noconfirm
+    rm -rf yay ; git clone https://aur.archlinux.org/yay.git ; cd yay ; makepkg -si --noconfirm ; cd .. ; rm -rf yay
+    sudo su - $USER -c "yay -Sy dnscrypt-proxy --noconfirm"
+    sudo cp -rf src/sys.conf/dnscrypt-proxy.toml /etc/dnscrypt-proxy/ ; sudo cp -rf src/sys.conf/dnscrypt-proxy.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo chattr -i /etc/resolv.conf
+    sudo systemctl --now disable systemd-resolved
+    sudo systemctl mask systemd-resolved
+    sudo pacman -Rsn resolvconf --noconfirm
+    sudo mv -f /etc/resolv.conf /etc/resolv.conf.back
+    sudo cp -rf src/sys.conf/resolv.conf /etc/
+    sudo chattr +i /etc/resolv.conf
+    sudo systemctl --now enable dnscrypt-proxy
+    sudo usermod -a -G tor ${USER}
+    sudo mv -f /etc/tor/torrc /etc/tor/torrc.old ; sudo mv -f /etc/tor/torsocks.conf /etc/tor/torsocks.conf.old
+    sudo cp -rf src/sys.conf/torrc /etc/tor/ ; sudo cp -rf src/sys.conf/torsocks.conf /etc/tor/torsocks.conf
+    sudo cp -rf src/sys.conf/tor.service /usr/lib/systemd/system/tor.service
+    sudo touch /var/lib/tor/control_socket ; sudo touch /var/lib/tor/control_auth_cookie
+    sudo chown -R tor:tor /etc/tor/
+    sudo chown -R tor:tor /var/lib/tor
+    sudo chmod -R 750 /var/lib/tor
+    sudo systemctl daemon-reload
+    clear
+    while true
+        do
+            clear
+            read -p "Create symblink for tor2tun to /bin (y/n) > " symblink
+            case $symblink in
+                [Yy] )  echo -en "#!/bin/bash\n$(dirname "${BASH_SOURCE[0]}")/tor2tun" | sudo su -c 'cat > /bin/tor2tun'
+                        sudo chmod +x /bin/tor2tun
+                        clear
+                        echo -e -n "$RED TOR2TUN INSTALLED"
+                        sleep 3; return 0 ;;  
+                [Nn] ) 	echo -e -n "  \n"
+                        echo -e -n "$RED All Done \n"
+                        sleep 1; return 1 ;;
+            esac
+    done
+    
+    }
+
+    function configure_all {
+    while true; do
+    read -p "Enter localhost IP (127.0.0.1) > " local_ip
+        if ! [ -z $local_ip ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter Tor local port (9050) > " local_port
+        if ! [ -z $local_port ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter bind interface (veth1) > " bind_iface
+        if ! [ -z $bind_iface ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter badvpn interface (tun11658) > " bad_tun
+        if ! [ -z $bad_tun ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter name of namespace (ns1) > " NS
+        if ! [ -z $NS ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter name of namespace link interface (veth1) > " VETH
+        if ! [ -z $VETH ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter name of interface in namespace (peth0) > " VPEER
+        if ! [ -z $VPEER ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter namespace link interface IP (10.200.1.1) > " VETH_ADDR
+        if ! [ -z $VETH_ADDR ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter interface in namespace IP (10.200.1.2) > " VPEER_ADDR
+        if ! [ -z $VPEER_ADDR ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter name of Wi-Fi interface (wlan1) > " wifi_iface
+        if ! [ -z $wifi_iface ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter hotspot name (HotSpot) > " wifi_name
+        if ! [ -z $wifi_name ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter hotspot password (minimum 8 characters) > " wifi_pass
+        if ! [ -z $wifi_pass ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter hotspot region (BZ) > " wifi_reg
+        if ! [ -z $wifi_reg ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+
+    while true; do
+    read -p "Enter hotspot MAC (46:03:08:01:89:55) > " wifi_mac
+        if ! [ -z $wifi_mac ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+    
+cat <<EOF > src/sys.conf/variables.conf
+This Is configuration file DON'T REMOVE IT
+$local_ip
+$local_port
+$bind_iface
+$bad_tun
+$NS
+$VETH
+$VPEER
+$VETH_ADDR
+$VPEER_ADDR
+$wifi_iface
+$wifi_name
+$wifi_pass
+$wifi_reg
+$wifi_mac
+EOF
+    }
+    
+    function configure_wifi {
+    while true; do
+    read -p "Enter name of Wi-Fi interface (wlan1) > " wifi_iface
+        if ! [ -z $wifi_iface ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+    
+    while true; do
+    read -p "Enter hotspot name (HotSpot) > " wifi_name
+        if ! [ -z $wifi_name ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+    
+    while true; do
+    read -p "Enter hotspot password (minimum 8 characters) > " wifi_pass
+        if ! [ -z $wifi_pass ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+    
+    while true; do
+    read -p "Enter hotspot region (BZ) > " wifi_reg
+        if ! [ -z $wifi_reg ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+    
+    while true; do
+    read -p "Enter hotspot MAC (46:03:08:01:89:55) > " wifi_mac
+        if ! [ -z $wifi_mac ];
+            then
+                clear
+                break
+            else
+                clear
+                continue
+        fi
+    done
+    sed -i "11c\\$wifi_iface" src/sys.conf/variables.conf
+    sed -i "12c\\$wifi_name" src/sys.conf/variables.conf
+    sed -i "13c\\$wifi_pass" src/sys.conf/variables.conf
+    sed -i "14c\\$wifi_reg" src/sys.conf/variables.conf
+    sed -i "15c\\$wifi_mac" src/sys.conf/variables.conf
+    }
+    
+settings_options=("Fix SUDO passwordless" "Install dependency" "Configure all" "Configure only Wi-Fi" "Go Back")
+
+    function set_opt_menu {
+    echo -en "$RED      Settings \n"
+    for i in $(seq 0 $((${#settings_options[@]}-1)))
+        do
+            echo "$((i+1)))" "${settings_options[$i]}"
+    done
+    }
+
+set_prompt=$(clear; set_opt_menu; echo -e -n " \n \n")
+PS3="${set_prompt}Select option [1-${#settings_options[@]}] : "
+select set_opt in "${settings_options[@]}"; do 
     case "$REPLY" in
 
 	1 ) clear
-		echo -e -n "$BLUE Tor->System \n"
-		src/torON_sys
-		clear
-		src/torOFF_sys
-		clear
-		echo -e -n  "$RED Press ENTER to continue \n";continue;;
-	2 ) clear
-		echo -e -n "$BLUE Tor->namespace \n"
-		src/torON_name
-		clear
-		src/torOFF_name
-		clear
-		echo -e -n  "$RED Press ENTER to continue \n";continue;;
-	3 ) clear
-		echo -e -n "$BLUE Tor->System->namespace \n"
-		src/torON_name_sys
-		clear
-		src/torOFF_name
-		clear
-		echo -e -n  "$RED Press ENTER to continue \n";continue;;
-	4 ) clear
-		echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
-		src/torON_name_wifi
-		clear
-		src/torOFF_name_wifi
-		clear
-		echo -e -n  "$RED Press ENTER to continue \n";continue;;
-	5 ) clear
-		echo -e -n "$BLUE Tor->System->namespace->Wi-Fi \n"
-		src/torON_name_sys_wifi
-		clear
-		src/torOFF_name_wifi
-		clear
-		echo -e -n  "$RED Press ENTER to continue \n";continue;;
-    6 ) clear
-		echo -e -n "$BLUE Settings \n"
-		src/settings
-		clear
-		echo -e -n  "$RED Press ENTER to continue \n";continue;;
+		fix_sudo
+		continue;;
+    2 ) clear
+		install_dependency
+		continue;;
+    3 ) clear
+		configure_all
+		continue;;
+    4 ) clear
+		configure_wifi
+		continue;;
 
-    $(( ${#options[@]}+1 )) ) clear; break;;
-    *) echo -e -n  "$RED Invalid option. Try another one. \n";continue;;
+    ${#settings_options[@]} ) clear; echo -e $RESETCOLOR; break;;
+    *) echo -e -n "  \n"; echo -e -n  "${BLUE}Invalid option. Try another one. \n"; sleep 0.5 ;continue;;
 
     esac
+done
+}
 
+options=("Tor->System" "Tor->namespace" "Tor->System->namespace" "Tor->namespace->Wi-Fi" "Tor->System->namespace->Wi-Fi" "Settings" "Quit")
+
+function opt_menu {
+echo -en "$RED          TOR2TUN \n"
+for i in $(seq 0 $((${#options[@]}-1)))
+    do
+        echo "$((i+1)))" "${options[$i]}"
+done
+}
+
+prompt=$(clear; opt_menu; echo -e -n " \n \n")
+PS3="${prompt}Select option [1-${#options[@]}] : "
+select opt in "${options[@]}"; do 
+    case "$REPLY" in
+
+	1 ) clear
+        cp -f ~/.bash_history ~/.bash_history.back
+		echo -e -n "$BLUE Run Tor->System \n"
+		torON_sys
+        mv -f ~/.bash_history.back ~/.bash_history
+		continue;;
+	2 ) clear
+        cp -f ~/.bash_history ~/.bash_history.back
+		echo -e -n "$BLUE Run Tor->namespace \n"
+		torON_name
+        mv -f ~/.bash_history.back ~/.bash_history
+		continue;;
+	3 ) clear
+	    cp -f ~/.bash_history ~/.bash_history.back
+		echo -e -n "$BLUE Run Tor->System->namespace \n"
+		torON_name_sys
+        mv -f ~/.bash_history.back ~/.bash_history
+		continue;;
+	4 ) clear
+	    cp -f ~/.bash_history ~/.bash_history.back
+		echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
+		torON_name_wifi
+        mv -f ~/.bash_history.back ~/.bash_history
+		continue;;
+	5 ) clear
+	    cp -f ~/.bash_history ~/.bash_history.back
+		echo -e -n "$BLUE Run Tor->System->namespace->Wi-Fi \n"
+		torON_name_sys_wifi
+        mv -f ~/.bash_history.back ~/.bash_history
+		continue;;
+    6 ) clear
+        cp -f ~/.bash_history ~/.bash_history.back
+		echo -e -n "$BLUE Settings \n"
+		settings
+		mv -f ~/.bash_history.back ~/.bash_history
+		PS3="${prompt}Select option [1-${#options[@]}] : "
+		continue;;
+
+    ${#options[@]} ) clear; echo -e $RESETCOLOR; break;;
+    *) echo -e -n "  \n"; echo -e -n  "${BLUE}Invalid option. Try another one. \n"; sleep 0.5 ;continue;;
+
+    esac
 done

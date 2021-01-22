@@ -1,0 +1,17 @@
+[Unit]
+Description=Anonymizing overlay network for TCP
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+User=tor
+Type=notify
+NotifyAccess=all
+ExecStartPre=/usr/bin/tor -f /etc/tor/torrc --verify-config
+ExecStart=/usr/bin/tor -f /etc/tor/torrc
+ExecReload=/bin/kill -HUP ${MAINPID}
+KillSignal=SIGTERM
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
