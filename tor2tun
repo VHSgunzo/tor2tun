@@ -821,14 +821,14 @@ select set_opt in "${settings_options[@]}"; do
     case "$REPLY" in
 
     1 ) clear
-		install_dependency
-		continue;;
+        install_dependency
+        continue;;
     2 ) clear
-		configure_all
-		continue;;
+        configure_all
+        continue;;
     3 ) clear
-		configure_wifi
-		continue;;
+        configure_wifi
+        continue;;
 
     ${#settings_options[@]} ) clear; echo -e $RESETCOLOR; break;;
     *) echo -e -n "  \n"; echo -e -n  "${BLUE}Invalid option. Try another one. \n"; sleep 0.5 ;continue;;
@@ -852,43 +852,43 @@ PS3="${prompt}Select option [1-${#options[@]}] : "
 select opt in "${options[@]}"; do 
     case "$REPLY" in
 
-	1 ) clear
+    1 ) clear
         cp -f ~/.bash_history ~/.bash_history.back
-		echo -e -n "$BLUE Run Tor->System \n"
-		torON_sys
+        echo -e -n "$BLUE Run Tor->System \n"
+        torON_sys
         mv -f ~/.bash_history.back ~/.bash_history
-		continue;;
-	2 ) clear
+        continue;;
+    2 ) clear
         cp -f ~/.bash_history ~/.bash_history.back
-		echo -e -n "$BLUE Run Tor->namespace \n"
-		torON_name
+        echo -e -n "$BLUE Run Tor->namespace \n"
+        torON_name
         mv -f ~/.bash_history.back ~/.bash_history
-		continue;;
-	3 ) clear
-	    cp -f ~/.bash_history ~/.bash_history.back
-		echo -e -n "$BLUE Run Tor->System->namespace \n"
-		torON_name_sys
+        continue;;
+    3 ) clear
+        cp -f ~/.bash_history ~/.bash_history.back
+        echo -e -n "$BLUE Run Tor->System->namespace \n"
+        torON_name_sys
         mv -f ~/.bash_history.back ~/.bash_history
-		continue;;
-	4 ) clear
-	    cp -f ~/.bash_history ~/.bash_history.back
-		echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
-		torON_name_wifi
+        continue;;
+    4 ) clear
+        cp -f ~/.bash_history ~/.bash_history.back
+        echo -e -n "$BLUE Run Tor->namespace->Wi-Fi \n"
+        torON_name_wifi
         mv -f ~/.bash_history.back ~/.bash_history
-		continue;;
-	5 ) clear
-	    cp -f ~/.bash_history ~/.bash_history.back
-		echo -e -n "$BLUE Run Tor->System->namespace->Wi-Fi \n"
-		torON_name_sys_wifi
+        continue;;
+    5 ) clear
+        cp -f ~/.bash_history ~/.bash_history.back
+        echo -e -n "$BLUE Run Tor->System->namespace->Wi-Fi \n"
+        torON_name_sys_wifi
         mv -f ~/.bash_history.back ~/.bash_history
-		continue;;
+        continue;;
     6 ) clear
         cp -f ~/.bash_history ~/.bash_history.back
-		echo -e -n "$BLUE Settings \n"
-		settings
-		mv -f ~/.bash_history.back ~/.bash_history
-		PS3="${prompt}Select option [1-${#options[@]}] : "
-		continue;;
+        echo -e -n "$BLUE Settings \n"
+        settings
+        mv -f ~/.bash_history.back ~/.bash_history
+        PS3="${prompt}Select option [1-${#options[@]}] : "
+        continue;;
 
     ${#options[@]} ) clear; echo -e $RESETCOLOR; break;;
     *) echo -e -n "  \n"; echo -e -n  "${BLUE}Invalid option. Try another one. \n"; sleep 0.5 ;continue;;
