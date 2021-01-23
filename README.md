@@ -18,7 +18,7 @@ All Debian-based distributions
 ## To get started:
 * **Download the latest revision**
 ```
-git clone https://github.com/VHSgunzo/tor2tun.git
+git clone -b debian_old https://github.com/VHSgunzo/tor2tun.git
 ```
 * **Switch to tool's directory**
 ```
