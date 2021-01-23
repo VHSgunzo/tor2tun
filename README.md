@@ -21,13 +21,9 @@ All Arch-based distributions
 ```
 git clone -b arch https://github.com/VHSgunzo/tor2tun.git
 ```
-* **Switch to tool's directory**
-```
-cd tor2tun
-```
 * **Run tor2tun**
 ```
-sudo ./tor2tun
+sudo tor2tun/tor2tun
 ```
 * Select the "Settings" item in the script menu
 * Install the necessary dependencies
