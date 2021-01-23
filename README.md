@@ -27,10 +27,9 @@ cd tor2tun
 ```
 * **Run tor2tun**
 ```
-./tor2tun
+sudo ./tor2tun
 ```
 * Select the "Settings" item in the script menu
-* Fix SUDO passwordless
 * Install the necessary dependencies
 * Configure script
 * Use it
