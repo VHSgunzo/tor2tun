@@ -3,7 +3,8 @@ if [[ $(id -u) -ne 0 ]]; then
     echo "You must run it as root" >&2
     exit 1
 fi
-cd $(dirname "${BASH_SOURCE[0]}")
+BASH_DIR=$(cd $(dirname "${BASH_SOURCE[0]}");pwd)
+cd $BASH_DIR
 export BLUE='\033[1;94m'
 export RED='\033[1;91m'
 export RESETCOLOR='\033[1;00m'
@@ -195,7 +196,7 @@ src/ttyecho -n /dev/pts/$dns "ip netns exec $NS su - root"
 src/ttyecho -n /dev/pts/$dns "clear; dnscrypt-proxy --config /etc/dnscrypt-proxy/dnscrypt-proxy.toml"
 src/ttyecho -n /dev/pts/$hotspot "ip netns exec $NS su - root"
 sleep 2
-src/ttyecho -n /dev/pts/$hotspot "clear; $(dirname "${BASH_SOURCE[0]}")/src/create_ap --daemon $wifi_iface $VPEER $wifi_name '$wifi_pass' --country $wifi_reg --mac $wifi_mac --no-virt ; while true; do create_ap --list-clients $wifi_iface; sleep 2; clear; done"
+src/ttyecho -n /dev/pts/$hotspot "clear; $BASH_DIR/src/create_ap --daemon $wifi_iface $VPEER $wifi_name '$wifi_pass' --country $wifi_reg --mac $wifi_mac --no-virt ; while true; do $BASH_DIR/src/create_ap --list-clients $wifi_iface; sleep 2; clear; done"
 }
 
 function nameOFF_Wi-Fi {
@@ -508,7 +509,7 @@ fi
 function settings {
      
     function install_dependency {
-    pacman -Sy tor torsocks nyx bash util-linux procps hostapd iproute2 iw haveged dnsmasq iptables net-tools git --noconfirm
+    pacman -Sy tor torsocks nyx bash util-linux procps hostapd iproute2 iw haveged dnsmasq iptables net-tools git xterm base-devel --noconfirm
     su - $USER -c "cd /tmp/ ; rm -rf yay ; git clone https://aur.archlinux.org/yay.git ; cd yay ; makepkg -si --noconfirm ; cd .. ; rm -rf yay"
     su - $USER -c "yay -Sy dnscrypt-proxy --noconfirm"
     cp -rf src/sys.conf/dnscrypt-proxy.toml /etc/dnscrypt-proxy/ ; cp -rf src/sys.conf/dnscrypt-proxy.service /etc/systemd/system/
@@ -537,7 +538,8 @@ function settings {
             read -p "Install tor2tun in system (y/n) > " install_tor2tun
             case $install_tor2tun in
                 [Yy] )  rm -rf /opt/tor2tun
-                        mv -f $(dirname "${BASH_SOURCE[0]}") /opt/
+                        mv -f $BASH_DIR /opt/
+                        chown -R root:root /opt/tor2tun
                         echo -en '#!/bin/bash\n/opt/tor2tun/tor2tun' | su -c 'cat > /bin/tor2tun'
                         chmod +x /bin/tor2tun
                         clear
