@@ -19,7 +19,7 @@ All Arch-based distributions
 ## To get started:
 * **Download the latest revision**
 ```
-git clone -b arch https://github.com/VHSgunzo/tor2tun.git
+git clone https://github.com/VHSgunzo/tor2tun.git
 ```
 * **Run tor2tun**
 ```
