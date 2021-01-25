@@ -8,7 +8,7 @@ cd $BASH_DIR
 export BLUE='\033[1;94m'
 export RED='\033[1;91m'
 export RESETCOLOR='\033[1;00m'
-USER=$(w|grep tty|grep -v grep|awk '{print $1}')
+USER=$(w|grep tty|grep -v grep|grep -v root|awk '{print $1}')
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u $USER)/bus"
 KDE_SESSION=$(w|grep tty|grep plasma|grep -v grep|awk '{print $1}')
 function torON_sys {
